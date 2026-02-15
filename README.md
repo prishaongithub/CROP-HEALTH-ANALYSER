@@ -1,121 +1,121 @@
 # 🌾 Crop Stress Detection using NDVI & Deep Learning (Punjab, India)
 
-This project builds an end-to-end **Remote Sensing + Deep Learning pipeline** to classify agricultural crop health/stress levels using **Sentinel-2 satellite imagery (GeoTIFF)** from Punjab, India.
+This repository contains an end-to-end **Remote Sensing + Deep Learning pipeline** for detecting crop vegetation stress using **Sentinel-2 satellite imagery** from Punjab, India.
 
-We extract NDVI-based patch datasets and train multiple ML/DL models including **Custom CNN**, **ResNet Transfer Learning**, and **Temporal CNN + LSTM** for vegetation stress classification.
-
----
-
-## 🎯 Project Goals
-
-✅ Generate NDVI maps from satellite imagery  
-✅ Convert NDVI into structured patch datasets  
-✅ Classify crop stress into **3 vegetation classes**  
-✅ Compare baseline vs deep learning vs temporal models  
-✅ Track experiments using **MLflow**
-
----
-
-## 🛰 Dataset Description
-
-Satellite imagery exported from **Google Earth Engine (GEE)**.
-
-### 📌 Source
-- Sentinel-2 Surface Reflectance (S2 SR)
-
-### 📌 Study Region
-- Punjab, India
-
-### 📌 Seasons Used
-- **Rabi 2023**
-- **Kharif 2023**
-
-### 📌 Temporal Data (Phase 3)
-NDVI stack for:
-- January 2023
-- February 2023
-- March 2023
+The project covers:
+- Satellite data extraction using **Google Earth Engine (GEE)**
+- NDVI computation and patch dataset creation
+- Training multiple ML/DL models:
+  - NDVI Threshold Baseline
+  - Custom CNN
+  - ResNet18 Transfer Learning
+  - Temporal NDVI CNN
+  - CNN + LSTM Temporal Model
+- Comparing models using **Accuracy, Explainability, Interpretability**
+- Experiment tracking using **MLflow**
 
 ---
 
-## 🌿 NDVI Computation
+## 🎯 Project Motivation
 
-NDVI is computed using:
+Agricultural monitoring requires detecting crop health/stress early and accurately.
 
-\[
-NDVI = \frac{NIR - RED}{NIR + RED}
-\]
-
-Where:
-- **Red = Band 4**
-- **NIR = Band 8**
+Satellite vegetation indices like **NDVI** provide a strong scientific signal of plant health, but deep learning models can go beyond simple NDVI thresholds by learning:
+- spatial crop texture
+- field structure
+- seasonal variation
+- temporal growth patterns
 
 ---
 
-## 🧩 Patch Creation
+## 🛰 Dataset (Not Uploaded to GitHub)
 
-The GeoTIFF is split into **32×32 patches**.
+⚠️ The dataset files (`.tif`) are **very large GeoTIFF files**, so they are **NOT included** in this GitHub repository.
 
-Each patch is labeled based on mean NDVI:
-
-| NDVI Range | Class | Meaning |
-|-----------|-------|---------|
-| < 0.3     | 0     | Low vegetation / stressed |
-| 0.3–0.6   | 1     | Medium vegetation |
-| > 0.6     | 2     | High vegetation / healthy |
+Instead, this README explains **how to reproduce the dataset** from scratch using Google Earth Engine.
 
 ---
 
-## 🧠 Models Implemented
+# 📌 DATA COLLECTION PIPELINE (Google Earth Engine)
+
+This dataset was created using **Sentinel-2 Surface Reflectance** imagery.
 
 ---
 
-### ✅ Model 1: NDVI Threshold Baseline (Rule-Based)
+## 🌍 Data Source
 
-A simple scientific heuristic:
-
-- NDVI < 0.3 → Stressed  
-- 0.3 ≤ NDVI < 0.6 → Moderate  
-- NDVI ≥ 0.6 → Healthy  
-
-⭐ **Explainability: 10/10**  
-⭐ **Interpretability: 10/10**  
-❌ Cannot learn spatial patterns
+- **Sentinel-2 SR (Surface Reflectance)**
+- Google Earth Engine collection:
+  - `COPERNICUS/S2_SR_HARMONIZED`
 
 ---
 
-### ✅ Model 2: Custom CNN (Single-Date Deep Learning)
+## 🗺 Study Region
 
-A CNN trained from scratch on NDVI patches.
-
-**Learns spatial patterns like:**
-- crop texture
-- irrigation patterns
-- field-level consistency
-
-⭐ **Explainability: 6/10**  
-⭐ **Accuracy: ~95–98%**
+- Punjab, India (cropland belt)
+- Region selected using polygon geometry in GEE
 
 ---
 
-### ✅ Model 3: ResNet18 Transfer Learning (Single-Date Multiband)
+## 📅 Seasons Used
 
-A pretrained **ResNet18** (ImageNet) fine-tuned on satellite patch dataset.
+### 🌾 Rabi Season (Wheat)
+- Example time range: Nov 2022 – Mar 2023
 
-**Inputs can include:**
-- NDVI only
-- Red + NIR + NDVI
-- RGB (B4, B3, B2)
-- Multiband Sentinel-2
-
-⭐ **Accuracy: ~98–99% (Best single-date performance)**  
-⭐ **Generalization: Very strong across Rabi + Kharif**
+### 🌱 Kharif Season (Rice / Monsoon Crops)
+- Example time range: Jun 2023 – Oct 2023
 
 ---
 
-### ✅ Model 4: Temporal CNN (NDVI Stack)
+## 🧠 Bands Exported
 
-Uses NDVI of multiple months as multi-channel input.
+Sentinel-2 bands used:
 
-Input shape:
+| Band | Name | Use |
+|------|------|-----|
+| B2 | Blue | RGB visualization |
+| B3 | Green | RGB visualization |
+| B4 | Red | NDVI |
+| B8 | NIR | NDVI |
 
+---
+
+# 🧾 Google Earth Engine Export Code
+
+Paste this code in **Google Earth Engine Code Editor**:
+
+```javascript
+// ------------------------------
+// 1) REGION (Punjab Example)
+// ------------------------------
+var region = /* your Punjab polygon geometry */;
+
+// ------------------------------
+// 2) Sentinel-2 Dataset
+// ------------------------------
+var s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+  .filterBounds(region)
+  .filterDate("2023-01-01", "2023-03-31") // change dates for season
+  .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20));
+
+// ------------------------------
+// 3) Median Composite
+// ------------------------------
+var composite = s2.median().clip(region);
+
+// ------------------------------
+// 4) Select Bands
+// ------------------------------
+var export_img = composite.select(["B2","B3","B4","B8"]);
+
+// ------------------------------
+// 5) Export to Drive
+// ------------------------------
+Export.image.toDrive({
+  image: export_img,
+  description: "Punjab_Rabi_2023",
+  folder: "GEE_Exports",
+  region: region,
+  scale: 10,
+  maxPixels: 1e13
+});
